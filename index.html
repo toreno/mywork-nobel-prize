@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ノーベル賞 受賞者検索（2026〜2000）</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #181b24;
+      --panel-2: #1f2330;
+      --border: #2a2f3d;
+      --text: #e6e8ee;
+      --muted: #9aa2b1;
+      --accent: #d4af37;
+      --accent-soft: rgba(212, 175, 55, 0.15);
+      --chip: #262b38;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      padding: 28px 20px 20px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #141720, #0f1117);
+    }
+    header h1 { margin: 0 0 6px; font-size: 1.6rem; letter-spacing: 0.02em; }
+    header h1 .medal { color: var(--accent); }
+    header p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+
+    .controls {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15, 17, 23, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px;
+    }
+    .controls-inner { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+    .search-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    #search {
+      flex: 1 1 320px;
+      min-width: 200px;
+      padding: 11px 14px;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+    }
+    #search:focus { border-color: var(--accent); }
+    #year-select {
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--chip);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .chip:hover { color: var(--text); border-color: #3a4152; }
+    .chip.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+    .count { color: var(--muted); font-size: 0.85rem; }
+
+    .options-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+    .opt-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .opt-label { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.04em; }
+    .opt-group .chip { font-size: 0.8rem; padding: 5px 11px; }
+
+    /* 簡易リスト表示 */
+    .list-rows { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .list-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 12px;
+      padding: 0;
+      border-bottom: 1px solid var(--border);
+      align-items: baseline;
+    }
+    .list-row:last-child { border-bottom: none; }
+    .list-row:nth-child(2n) { background: none; }
+    .list-cat { font-size: 0.76rem; padding: 9px 14px; font-weight: 100; }
+    .list-body { font-size: 0.9rem; }
+    .list-body .lsep { color: var(--border); margin: 0 7px; }
+    .list-names { font-weight: 600; }
+    .list-names .len { color: var(--muted); font-weight: 400; font-size: 0.8rem; margin-left: 4px; }
+    .list-country { color: var(--muted); font-size: 0.82rem; }
+    .list-reason { color: var(--muted); }
+    .list-cat.cat-physics    { color: #7fb5ff; }
+    .list-cat.cat-chemistry  { color: #74d6a3; }
+    .list-cat.cat-medicine   { color: #ff9bbd; }
+    .list-cat.cat-literature { color: #e3c377; }
+    .list-cat.cat-peace      { color: #78dbe0; }
+    .list-cat.cat-economics  { color: #b79bff; }
+
+    /* 単一部門ビュー（部門名を見出しに「年｜内容」を縦に並べる） */
+    .cat-view { }
+    .cv-head {
+      margin: 0 0 10px;
+      padding-bottom: 8px;
+      font-size: 1.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+    .cv-head.cat-physics    { color: #7fb5ff; }
+    .cv-head.cat-chemistry  { color: #74d6a3; }
+    .cv-head.cat-medicine   { color: #ff9bbd; }
+    .cv-head.cat-literature { color: #e3c377; }
+    .cv-head.cat-peace      { color: #78dbe0; }
+    .cv-head.cat-economics  { color: #b79bff; }
+    .cv-rows { display: flex; flex-direction: column; }
+    .cv-row {
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+      padding: 7px 2px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.92rem;
+    }
+    .cv-row:last-child { border-bottom: none; }
+    .cv-year { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto; }
+    .cv-sep { color: var(--border); flex: 0 0 auto; }
+    .cv-body { color: var(--text); }
+    .cv-names { font-weight: 600; }
+    .cv-names .len { color: var(--muted); font-weight: 400; font-size: 0.8rem; margin-left: 4px; }
+    .cv-country { color: var(--muted); font-size: 0.85rem; }
+    .cv-reason { color: var(--muted); }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+    .year-block { margin-bottom: 34px; }
+    .year-head {
+      display: flex; align-items: baseline; gap: 12px;
+      border-bottom: 2px solid var(--accent-soft);
+      padding-bottom: 6px; margin-bottom: 14px;
+    }
+    .year-head h2 { margin: 0; font-size: 1.5rem; color: var(--accent); }
+    .year-note { color: var(--muted); font-size: 0.85rem; margin: -6px 0 14px; }
+
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .card.hidden { display: none; }
+    .cat-label {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 3px 9px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .cat-physics    { background: #16304d; color: #7fb5ff; }
+    .cat-chemistry  { background: #163d2e; color: #74d6a3; }
+    .cat-medicine   { background: #3d1626; color: #ff9bbd; }
+    .cat-literature { background: #3a2d16; color: #e3c377; }
+    .cat-peace      { background: #16373d; color: #78dbe0; }
+    .cat-economics  { background: #2e2347; color: #b79bff; }
+
+    .laureates { margin: 0 0 8px; }
+    .laureate { margin-bottom: 3px; }
+    .laureate .lname { font-weight: 600; }
+    .laureate .len { color: var(--muted); font-size: 0.82rem; }
+    .laureate .lcountry {
+      font-size: 0.72rem; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 5px;
+      padding: 0 6px; margin-left: 6px;
+    }
+    .reason { color: var(--muted); font-size: 0.88rem; margin: 0; }
+    mark { background: var(--accent); color: #000; border-radius: 3px; padding: 0 2px; }
+
+    /* やさしい解説ブロック（項目「解説」がオンのとき表示） */
+    .plain-text {
+      margin: 8px 0 0;
+      padding: 10px 12px;
+      font-size: 0.86rem;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--accent-soft);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+    }
+    .plain-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 0 5px;
+      margin-right: 8px;
+      vertical-align: 1px;
+    }
+    .plain-empty { color: var(--muted); font-style: italic; }
+
+    .empty { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 1.05rem; }
+    footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px 20px 40px; border-top: 1px solid var(--border); }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="medal">&#127942;</span> ノーベル賞 受賞者検索</h1>
+    <p>2026年 〜 2000年 ／ 全6部門</p>
+  </header>
+
+  <div class="controls">
+    <div class="controls-inner">
+      <div class="search-row">
+        <input id="search" type="search" placeholder="受賞者名・国・業績でキーワード検索（例: 山中、日本、ニュートリノ）" autocomplete="off" />
+        <select id="year-select"><option value="all">すべての年</option></select>
+      </div>
+      <div class="chips" id="chips">
+        <span class="chip active" data-cat="all">すべて</span>
+        <span class="chip" data-cat="physics">物理学</span>
+        <span class="chip" data-cat="chemistry">化学</span>
+        <span class="chip" data-cat="medicine">生理学・医学</span>
+        <span class="chip" data-cat="literature">文学</span>
+        <span class="chip" data-cat="peace">平和</span>
+        <span class="chip" data-cat="economics">経済学</span>
+      </div>
+      <div class="options-row">
+        <div class="opt-group" id="view-toggle">
+          <span class="opt-label">表示</span>
+          <span class="chip active" data-view="card">カード</span>
+          <span class="chip" data-view="list">簡易リスト</span>
+        </div>
+        <div class="opt-group" id="field-toggle">
+          <span class="opt-label">項目</span>
+          <span class="chip active" data-field="name">氏名</span>
+          <span class="chip active" data-field="country">国</span>
+          <span class="chip active" data-field="reason">内容</span>
+          <span class="chip" data-field="plain">解説</span>
+        </div>
+      </div>
+      <div class="count" id="count"></div>
+    </div>
+  </div>
+
+  <main id="results"></main>
+
+  <footer>
+    出典: <a href="https://www.nobelprize.org/" target="_blank" rel="noopener">Nobel Prize 公式</a> ／ Wikipedia 各年ページ。受賞理由は要約・言い換えしています。
+  </footer>
+
+  <script src="nobel-data.js"></script>
+  <script>
+    const CAT_LABELS = {
+      physics: "物理学", chemistry: "化学", medicine: "生理学・医学",
+      literature: "文学", peace: "平和", economics: "経済学"
+    };
+    const CAT_ORDER = ["physics", "chemistry", "medicine", "literature", "peace", "economics"];
+
+    const data = window.NOBEL_DATA || [];
+    const resultsEl = document.getElementById("results");
+    const searchEl = document.getElementById("search");
+    const yearSelect = document.getElementById("year-select");
+    const chipsEl = document.getElementById("chips");
+    const countEl = document.getElementById("count");
+    const viewToggle = document.getElementById("view-toggle");
+    const fieldToggle = document.getElementById("field-toggle");
+
+    let activeCat = "all";
+    let activeYear = "all";
+    let query = "";
+    let viewMode = "card";                 // "card" | "list"
+    let fields = { name: true, country: true, reason: true, plain: false };
+
+    // 年セレクトを生成
+    data.forEach(d => {
+      const opt = document.createElement("option");
+      opt.value = String(d.year);
+      opt.textContent = d.year + "年";
+      yearSelect.appendChild(opt);
+    });
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function highlight(text) {
+      const safe = escapeHtml(text);
+      if (!query) return safe;
+      const q = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return safe.replace(new RegExp(q, "gi"), m => `<mark>${m}</mark>`);
+    }
+
+    // 1件がキーワードに一致するか（部門単位）
+    function matchesQuery(entry) {
+      if (!query) return true;
+      const q = query.toLowerCase();
+      const hay = [
+        entry.reason,
+        ...entry.laureates.map(l => l.name + " " + l.en + " " + l.country)
+      ].join(" ").toLowerCase();
+      return hay.includes(q);
+    }
+
+    // カード1枚ぶんのHTML
+    function cardHtml(cat, entry) {
+      let laureatesHtml = "";
+      if (fields.name || fields.country) {
+        laureatesHtml = `<div class="laureates">` + entry.laureates.map(l => {
+          const name = fields.name ? `<span class="lname">${highlight(l.name)}</span> <span class="len">${highlight(l.en)}</span>` : "";
+          const country = fields.country ? `<span class="lcountry">${highlight(l.country)}</span>` : "";
+          return `<div class="laureate">${name}${country}</div>`;
+        }).join("") + `</div>`;
+      }
+      const reasonHtml = fields.reason ? `<p class="reason">${highlight(entry.reason)}</p>` : "";
+      let plainHtml = "";
+      if (fields.plain) {
+        plainHtml = entry.plain
+          ? `<p class="plain-text"><span class="plain-badge">解説</span>${highlight(entry.plain)}</p>`
+          : `<p class="plain-text plain-empty">（解説は準備中）</p>`;
+      }
+      return `
+        <div class="card">
+          <span class="cat-label cat-${cat}">${CAT_LABELS[cat]}</span>
+          ${laureatesHtml}${reasonHtml}${plainHtml}
+        </div>`;
+    }
+
+    // 簡易リスト1行ぶんのHTML
+    function listRowHtml(cat, entry) {
+      const parts = [];
+      if (fields.name) {
+        const names = entry.laureates.map(l => {
+          const en = `<span class="len">${highlight(l.en)}</span>`;
+          return `${highlight(l.name)} ${en}`;
+        }).join("、 ");
+        parts.push(`<span class="list-names">${names}</span>`);
+      }
+      if (fields.country) {
+        const countries = [...new Set(entry.laureates.map(l => l.country))].join(" / ");
+        parts.push(`<span class="list-country">${highlight(countries)}</span>`);
+      }
+      if (fields.reason) {
+        parts.push(`<span class="list-reason">${highlight(entry.reason)}</span>`);
+      }
+      const body = parts.join(`<span class="lsep">|</span>`) || `<span class="list-reason">（表示項目が選択されていません）</span>`;
+      let plainHtml = "";
+      if (fields.plain) {
+        plainHtml = entry.plain
+          ? `<p class="plain-text"><span class="plain-badge">解説</span>${highlight(entry.plain)}</p>`
+          : `<p class="plain-text plain-empty">（解説は準備中）</p>`;
+      }
+      return `
+        <div class="list-row">
+          <span class="list-cat cat-${cat}">${CAT_LABELS[cat]}</span>
+          <span class="list-body">${body}${plainHtml}</span>
+        </div>`;
+    }
+
+    // 単一部門ビュー：部門名を見出しに、「年 ｜ 内容」を縦に並べる
+    function renderCategoryView(cat) {
+      const years = data.filter(d => activeYear === "all" || String(d.year) === activeYear);
+      const rows = [];
+
+      years.forEach(d => {
+        const entry = d.categories[cat];
+        if (!entry) return;
+        if (!matchesQuery(entry)) return;
+
+        const parts = [];
+        if (fields.name) {
+          parts.push(`<span class="cv-names">` + entry.laureates.map(l =>
+            `${highlight(l.name)}<span class="len">${highlight(l.en)}</span>`
+          ).join("、 ") + `</span>`);
+        }
+        if (fields.country) {
+          const countries = [...new Set(entry.laureates.map(l => l.country))].join(" / ");
+          parts.push(`<span class="cv-country">${highlight(countries)}</span>`);
+        }
+        if (fields.reason) {
+          parts.push(`<span class="cv-reason">${highlight(entry.reason)}</span>`);
+        }
+        const body = parts.join(`<span class="cv-sep">｜</span>`) || `<span class="cv-reason">（表示項目なし）</span>`;
+        let plainHtml = "";
+        if (fields.plain) {
+          plainHtml = entry.plain
+            ? `<p class="plain-text"><span class="plain-badge">解説</span>${highlight(entry.plain)}</p>`
+            : `<p class="plain-text plain-empty">（解説は準備中）</p>`;
+        }
+
+        rows.push(`
+          <div class="cv-row">
+            <span class="cv-year">${d.year}年</span>
+            <span class="cv-sep">｜</span>
+            <span class="cv-body">${body}${plainHtml}</span>
+          </div>`);
+      });
+
+      if (rows.length === 0) {
+        resultsEl.innerHTML = `<div class="empty">該当する受賞がありません。キーワードや絞り込みを変えてみてください。</div>`;
+        countEl.textContent = "0 件";
+        return;
+      }
+
+      resultsEl.innerHTML = `
+        <div class="cat-view">
+          <h2 class="cv-head cat-${cat}">${CAT_LABELS[cat]}</h2>
+          <div class="cv-rows">${rows.join("")}</div>
+        </div>`;
+      countEl.textContent = rows.length + " 件の受賞を表示中";
+    }
+
+    function render() {
+      resultsEl.innerHTML = "";
+      resultsEl.classList.toggle("view-list", viewMode === "list");
+
+      // 単一部門を選択しているときは一覧性重視の専用ビュー
+      if (activeCat !== "all") {
+        renderCategoryView(activeCat);
+        return;
+      }
+
+      let total = 0;
+
+      const years = data.filter(d => activeYear === "all" || String(d.year) === activeYear);
+
+      years.forEach(d => {
+        const cats = CAT_ORDER.filter(c => activeCat === "all" || c === activeCat);
+        const items = [];
+
+        cats.forEach(cat => {
+          const entry = d.categories[cat];
+          if (!entry) return;
+          if (!matchesQuery(entry)) return;
+          items.push(viewMode === "list" ? listRowHtml(cat, entry) : cardHtml(cat, entry));
+        });
+
+        if (items.length === 0) return;
+        total += items.length;
+
+        const inner = viewMode === "list"
+          ? `<div class="list-rows">${items.join("")}</div>`
+          : `<div class="cards">${items.join("")}</div>`;
+
+        const block = document.createElement("div");
+        block.className = "year-block";
+        block.innerHTML = `
+          <div class="year-head"><h2>${d.year}年</h2></div>
+          ${(activeCat === "all" && viewMode === "card" && fields.reason && d.note) ? `<p class="year-note">${highlight(d.note)}</p>` : ""}
+          ${inner}`;
+        resultsEl.appendChild(block);
+      });
+
+      if (total === 0) {
+        resultsEl.innerHTML = `<div class="empty">該当する受賞がありません。キーワードや絞り込みを変えてみてください。</div>`;
+        countEl.textContent = "0 件";
+      } else {
+        countEl.textContent = total + " 件の受賞を表示中";
+      }
+    }
+
+    searchEl.addEventListener("input", e => { query = e.target.value.trim(); render(); });
+    yearSelect.addEventListener("change", e => { activeYear = e.target.value; render(); });
+    chipsEl.addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      activeCat = chip.dataset.cat;
+      chipsEl.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
+      render();
+    });
+
+    // 表示モード（カード / 簡易リスト）：単一選択
+    viewToggle.addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      viewMode = chip.dataset.view;
+      viewToggle.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c === chip));
+      render();
+    });
+
+    // 項目（氏名 / 国 / 内容 / 解説）：複数選択トグル
+    fieldToggle.addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      const f = chip.dataset.field;
+      fields[f] = !fields[f];
+      // 全部オフは不可（最低1つは残す）
+      if (!fields.name && !fields.country && !fields.reason && !fields.plain) {
+        fields[f] = true;
+        return;
+      }
+      chip.classList.toggle("active", fields[f]);
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
